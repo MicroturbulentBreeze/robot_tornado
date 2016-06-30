@@ -1,0 +1,33 @@
+# -*- coding:utf-8 -*-  
+
+import tornado.ioloop  
+import tornado.web  
+import tornado.options
+import tornado.autoreload
+import tornado.httpserver
+from tornado.options import define, options
+#from config import *
+settings = {'debug' : True}
+define("debug",default=True,help="Debug Mode",type=bool)
+ 
+class MainHandler(tornado.web.RequestHandler):  
+	def get(self):  
+		self.write('<html><body><form action="/" method="post">'
+				   '<input type="text" name="message">'
+				   '<input type="submit" value="Submit">'
+				   '</form></body></html>') 
+	def post(self):
+		#self.set_header("Content-Type", "text/plain")
+		#print "aaa"
+		#print self.get_argument("message")
+		self.write("You wrote " + self.get_argument("message")) 
+		self.write("You wrote " + self.get_argument("message")) 
+		 
+application = tornado.web.Application([  
+    (r"/",MainHandler),  
+],**settings)  
+  
+if __name__=="__main__":  
+    application.listen(28888)  
+    tornado.ioloop.IOLoop.instance().start()  
+	
