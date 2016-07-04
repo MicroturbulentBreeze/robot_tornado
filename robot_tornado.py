@@ -8,13 +8,66 @@ import tornado.httpserver
 from tornado.options import define, options
 import aiml
 import os
+import hashlib
+import xmltodict
+import json;
+import sys
+reload(sys)
+sys.setdefaultencoding('utf8') 
 #from config import *
-settings = {'debug' : True}
+settings = {'debug' : True, 'wx_token' : 'husky', 'Token' : 'husky','wx_test':True}
 define("debug",default=True,help="Debug Mode",type=bool)
 alice=""
 
+def check_wx_request(signature, timestamp, nonce):
+    token = settings['wx_token']
+    arr = [token, timestamp, nonce]
+    arr.sort()
+    sh = hashlib.sha1(arr[0] + arr[1] + arr[2]).hexdigest()
+    if sh == signature:
+        return True
+    else:
+        return False
+def my_req(msg_body):
+	js_msg = xmltodict.parse(msg_body)
+	jsonStr = json.dumps(js_msg);
+	msg = js_msg['xml']
+	MsgType = msg['MsgType']
+
+	main_content = {}
+	main_content['MsgType'] = msg['MsgType']
+	main_content['CreateTime'] = msg['CreateTime']
+	main_content['ToUserName'] = msg['FromUserName']
+	main_content['FromUserName'] = msg['ToUserName']
+
+	main_content['MsgType'] = 'text'
+	main_content['Content'] = '''Sorry I can't understand you'''
+	if MsgType == 'text':
+		req = msg['Content']
+		respond = alice.respond(req)
+		if respond == None or len(respond) < 1:
+			respond = '''Sorry I can't understand you'''
+		main_content['Content'] = respond
+	elif MsgType == 'image':
+		pass
+	elif MsgType == 'voice':
+		pass
+	elif MsgType == 'video':
+		pass
+	elif MsgType == 'shortvideo':
+		pass
+	elif MsgType == 'location':
+		pass
+	elif MsgType == 'link':
+		pass
+	else:
+		pass		
+	result = {}
+	result['xml'] = main_content
+	return xmltodict.unparse(result)
+
 def alice_init():
-	os.chdir('/home/wangxin/alice')
+	os.chdir('/root/robot_tornado/alice')
 	alice = aiml.Kernel()
 	alice.learn("startup.xml")
 	alice.respond('LOAD ALICE')
@@ -42,15 +95,41 @@ class AliceHandler(tornado.web.RequestHandler):
 			self.write(alice.respond(req))
 
 	def post(self):
-		self.write('this is the POST method !')		  
-  
+		self.write('this is the POST method !')		
+		
+
+class WeChat(tornado.web.RequestHandler):
+
+	def get(self):
+		signature = self.get_argument('signature', 'default')
+		timestamp = self.get_argument('timestamp', 'default')
+		nonce = self.get_argument('nonce', 'default')
+		echostr = self.get_argument('echostr', 'default')
+		if check_wx_request(signature, timestamp, nonce):
+			self.write(echostr)
+		else:
+			self.write('fail')
+
+	def post(self):
+		signature = self.get_argument('signature', 'default')
+		timestamp = self.get_argument('timestamp', 'default')
+		nonce = self.get_argument('nonce', 'default')
+		if settings['wx_test'] or (signature != 'default' and timestamp != 'default' and nonce != 'default' and check_wx_request(signature, timestamp, nonce)):
+			body = self.request.body
+			try:
+				#self.write("success")
+				self.write(my_req(body))
+			except IOError, e:
+				return
+		
 if __name__=="__main__":  
 	alice=alice_init()
 	application = tornado.web.Application([  
 		(r"/",MainHandler),  
 		(r"/alice",AliceHandler), 
+		(r"/wx",WeChat), 
 	],**settings)
 		
-	application.listen(28888)  
+	application.listen(80)  
 	tornado.ioloop.IOLoop.instance().start()  
 	
